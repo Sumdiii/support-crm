@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ticket Details</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: Arial, sans-serif; background: #f5f5f5; padding: 20px; }
+    .container { max-width: 900px; margin: 0 auto; }
+    .back-link { display: inline-block; margin-bottom: 20px; color: #007bff; text-decoration: none; }
+    .back-link:hover { text-decoration: underline; }
+    .header { background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    .header h1 { margin-bottom: 15px; }
+    .meta { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }
+    .meta-item { }
+    .meta-label { color: #666; font-size: 12px; font-weight: 600; }
+    .meta-value { color: #333; font-size: 16px; font-weight: 600; margin-top: 5px; }
+    .badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; }
+    .badge-open { background: #ffebee; color: #c62828; }
+    .badge-progress { background: #fff3e0; color: #e65100; }
+    .badge-closed { background: #e8f5e9; color: #2e7d32; }
+    .content { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
+    .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    .card h2 { margin-bottom: 15px; font-size: 16px; }
+    .description { background: #f8f9fa; padding: 15px; border-radius: 4px; line-height: 1.6; }
+    .notes-list { }
+    .note { background: #f8f9fa; padding: 12px; border-radius: 4px; margin-bottom: 10px; }
+    .note-author { color: #007bff; font-weight: bold; font-size: 12px; }
+    .note-date { color: #999; font-size: 12px; }
+    .note-text { margin-top: 8px; color: #333; }
+    textarea { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; min-height: 80px; font-family: Arial; }
+    .btn { padding: 10px 15px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; margin-top: 10px; width: 100%; }
+    .btn:hover { background: #0056b3; }
+    .btn-danger { background: #dc3545; }
+    .btn-danger:hover { background: #c82333; }
+    .btn-success { background: #28a745; }
+    .btn-success:hover { background: #218838; }
+    select { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; }
+    .form-group { margin-bottom: 15px; }
+    .form-group label { display: block; margin-bottom: 5px; font-weight: 600; color: #333; font-size: 12px; }
+    .message { padding: 15px; margin-bottom: 20px; border-radius: 4px; display: none; }
+    .message.success { background: #d4edda; color: #155724; }
+    .message.error { background: #f8d7da; color: #721c24; }
+    .loading { text-align: center; padding: 40px; color: #999; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <a href="index.html" class="back-link">← Back to Dashboard</a>
+    
+    <div id="loading" class="loading">Loading ticket...</div>
+
+    <div id="main" style="display: none;">
+      <div id="message" class="message"></div>
+
+      <div class="header">
+        <h1 id="subject"></h1>
+        <div class="meta">
+          <div class="meta-item">
+            <div class="meta-label">Ticket ID</div>
+            <div class="meta-value" id="ticket-id"></div>
+          </div>
+          <div class="meta-item">
+            <div class="meta-label">Status</div>
+            <div id="status-badge"></div>
+          </div>
+          <div class="meta-item">
+            <div class="meta-label">Customer</div>
+            <div class="meta-value" id="customer"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div>
+          <div class="card">
+            <h2>Description</h2>
+            <div class="description" id="description"></div>
+          </div>
+
+          <div class="card">
+            <h2>Notes & Comments</h2>
+            <div class="notes-list" id="notes"></div>
+            <textarea id="note-text" placeholder="Add a note..."></textarea>
+            <button class="btn btn-success" onclick="addNote()">Add Note</button>
+          </div>
+        </div>
+
+        <div>
+          <div class="card">
+            <h2>Update Ticket</h2>
+            <div class="form-group">
+              <label>Status</label>
+              <select id="status-select">
+                <option>Open</option>
+                <option>In Progress</option>
+                <option>Closed</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Priority</label>
+              <select id="priority-select">
+                <option>High</option>
+                <option>Medium</option>
+                <option>Low</option>
+              </select>
+            </div>
+            <button class="btn" onclick="updateTicket()">Save Changes</button>
+            <button class="btn btn-success" onclick="quickClose()">Close Ticket</button>
+            <button class="btn btn-danger" onclick="deleteTicket()">Delete</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const ticketId = new URLSearchParams(location.search).get('id');
+    if (!ticketId) location.href = 'index.html';
+
+    async function loadTicket() {
+      const res = await fetch(`/api/tickets/${ticketId}`);
+      if (!res.ok) { location.href = 'index.html'; return; }
+      const ticket = await res.json();
+      
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('main').style.display = 'block';
+      
+      document.getElementById('ticket-id').textContent = ticket.ticket_id;
+      document.getElementById('subject').textContent = ticket.subject;
+      document.getElementById('customer').textContent = ticket.customer_name + ' (' + ticket.customer_email + ')';
+      document.getElementById('description').textContent = ticket.description;
+      document.getElementById('status-select').value = ticket.status;
+      document.getElementById('priority-select').value = ticket.priority;
+      
+      const badge = document.createElement('span');
+      badge.className = `badge badge-${ticket.status.toLowerCase().replace(' ', '-')}`;
+      badge.textContent = ticket.status;
+      document.getElementById('status-badge').appendChild(badge);
+      
+      const notes = ticket.notes || [];
+      if (notes.length) {
+        document.getElementById('notes').innerHTML = notes.map(n => `
+          <div class="note">
+            <div><span class="note-author">${n.author}</span> <span class="note-date">${new Date(n.created_at).toLocaleString()}</span></div>
+            <div class="note-text">${n.note_text}</div>
+          </div>
+        `).join('');
+      } else {
+        document.getElementById('notes').innerHTML = '<p style="color: #999;">No notes yet</p>';
+      }
+    }
+
+    async function updateTicket() {
+      const res = await fetch(`/api/tickets/${ticketId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          status: document.getElementById('status-select').value,
+          priority: document.getElementById('priority-select').value
+        })
+      });
+      if (res.ok) {
+        showMessage('✓ Ticket updated!', 'success');
+        setTimeout(loadTicket, 1000);
+      } else {
+        showMessage('Error updating ticket', 'error');
+      }
+    }
+
+    async function quickClose() {
+      const res = await fetch(`/api/tickets/${ticketId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'Closed' })
+      });
+      if (res.ok) {
+        showMessage('✓ Ticket closed!', 'success');
+        setTimeout(loadTicket, 1000);
+      }
+    }
+
+    async function addNote() {
+      const text = document.getElementById('note-text').value.trim();
+      if (!text) return;
+      
+      const res = await fetch(`/api/tickets/${ticketId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ note_text: text })
+      });
+      if (res.ok) {
+        document.getElementById('note-text').value = '';
+        showMessage('✓ Note added!', 'success');
+        setTimeout(loadTicket, 500);
+      }
+    }
+
+    async function deleteTicket() {
+      if (!confirm('Delete this ticket?')) return;
+      const res = await fetch(`/api/tickets/${ticketId}`, { method: 'DELETE' });
+      if (res.ok) {
+        showMessage('Ticket deleted', 'success');
+        setTimeout(() => location.href = 'index.html', 1500);
+      }
+    }
+
+    function showMessage(text, type) {
+      const msg = document.getElementById('message');
+      msg.textContent = text;
+      msg.className = `message ${type}`;
+    }
+
+    loadTicket();
+  </script>
+</body>
+</html>

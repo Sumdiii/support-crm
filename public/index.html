@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SupportDesk CRM - Dashboard</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: Arial, sans-serif; background: #f5f5f5; padding: 20px; }
+    .container { max-width: 1200px; margin: 0 auto; }
+    h1 { margin-bottom: 20px; color: #333; }
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 30px; }
+    .stat { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center; }
+    .stat-num { font-size: 32px; font-weight: bold; color: #007bff; }
+    .stat-label { color: #666; margin-top: 5px; font-size: 14px; }
+    .toolbar { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+    input, select { padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; }
+    input { flex: 1; min-width: 200px; }
+    button { padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+    button:hover { background: #0056b3; }
+    table { width: 100%; background: white; border-collapse: collapse; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    th { background: #f8f9fa; padding: 15px; text-align: left; font-weight: 600; border-bottom: 1px solid #ddd; }
+    td { padding: 12px 15px; border-bottom: 1px solid #ddd; }
+    tr:hover { background: #f9f9f9; }
+    .ticket-id { color: #007bff; font-weight: bold; cursor: pointer; }
+    .badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; }
+    .badge-open { background: #ffebee; color: #c62828; }
+    .badge-progress { background: #fff3e0; color: #e65100; }
+    .badge-closed { background: #e8f5e9; color: #2e7d32; }
+    .empty { text-align: center; color: #999; padding: 40px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>📋 SupportDesk CRM</h1>
+    
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-num" id="total">0</div>
+        <div class="stat-label">Total Tickets</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num" id="open">0</div>
+        <div class="stat-label">Open</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num" id="progress">0</div>
+        <div class="stat-label">In Progress</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num" id="closed">0</div>
+        <div class="stat-label">Closed</div>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <input type="text" id="search" placeholder="Search by name, email, ID...">
+      <select id="status">
+        <option value="All">All Status</option>
+        <option value="Open">Open</option>
+        <option value="In Progress">In Progress</option>
+        <option value="Closed">Closed</option>
+      </select>
+      <a href="create.html" style="text-decoration: none;"><button>+ New Ticket</button></a>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Ticket ID</th>
+          <th>Customer</th>
+          <th>Subject</th>
+          <th>Status</th>
+          <th>Created</th>
+        </tr>
+      </thead>
+      <tbody id="tickets">
+        <tr><td colspan="5" class="empty">Loading tickets...</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <script>
+    async function loadStats() {
+      const res = await fetch('/api/stats');
+      const stats = await res.json();
+      document.getElementById('total').textContent = stats.total;
+      document.getElementById('open').textContent = stats.open;
+      document.getElementById('progress').textContent = stats.inProgress;
+      document.getElementById('closed').textContent = stats.closed;
+    }
+
+    async function loadTickets() {
+      const search = document.getElementById('search').value;
+      const status = document.getElementById('status').value;
+      let url = `/api/tickets?`;
+      if (search) url += `search=${encodeURIComponent(search)}&`;
+      if (status !== 'All') url += `status=${encodeURIComponent(status)}&`;
+      
+      const res = await fetch(url);
+      const tickets = await res.json();
+      
+      const tbody = document.getElementById('tickets');
+      if (!tickets.length) {
+        tbody.innerHTML = '<tr><td colspan="5" class="empty">No tickets found. <a href="create.html">Create one?</a></td></tr>';
+        return;
+      }
+      
+      tbody.innerHTML = tickets.map(t => `
+        <tr onclick="location.href='ticket.html?id=${t.ticket_id}'">
+          <td><span class="ticket-id">${t.ticket_id}</span></td>
+          <td>${t.customer_name}</td>
+          <td>${t.subject}</td>
+          <td><span class="badge badge-${t.status.toLowerCase().replace(' ', '-')}">${t.status}</span></td>
+          <td>${new Date(t.created_at).toLocaleDateString()}</td>
+        </tr>
+      `).join('');
+    }
+
+    document.getElementById('search').addEventListener('input', loadTickets);
+    document.getElementById('status').addEventListener('change', loadTickets);
+    
+    loadStats();
+    loadTickets();
+  </script>
+</body>
+</html>
